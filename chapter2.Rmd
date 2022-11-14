@@ -1,13 +1,112 @@
-# Insert chapter 2 title here
+# Week 2. Regression and model validation
 
-*Describe the work you have done this week and summarize your learning.*
-
-- Describe your work and results clearly. 
-- Assume the reader has an introductory course level understanding of writing and reading R code as well as statistical methods.
-- Assume the reader has no previous knowledge of your data or the more advanced methods you are using.
+This is the report for the second week assignment (the analysis part of the assignment in particular).
 
 ```{r}
 date()
 ```
 
-Here we go again...
+Load needed packages:
+```{r, message=FALSE}
+library(tidyverse)
+library(finalfit)
+library(ggplot2)
+library(GGally)
+library(patchwork)
+```
+
+### 1. Read in data 
+
+I read the data from my local folder. (I hope it is as it should!)
+```{r, message=FALSE}
+lrn2014 <- read_csv("data/learning2014.csv")
+```
+
+```{r}
+str(lrn2014)
+ff_glimpse(lrn2014)
+```
+
+The exercise is based on survey data which was collected in 2014 from students participating in the statistics course *Introduction to Social Statistics*. 
+The data contains information on students exam points and attitudes towards statistics and learning.
+
+The dataset has 166 observations (rows) of 7 variables (columns) of which 1 is character and 6 numerical. There are no missing values. Students ages range between 17 and 55 years.
+
+### 2. Overview of data
+
+The plot matrix visualizes the distributions of the variables (diagonal), and the plotted relationships and correlations between them, for women (in **red**) and men (in **turquoise**) separately. 
+```{r}
+ggpairs(lrn2014, mapping = aes(col = gender, alpha = 0.3), lower = list(continuous = wrap("smooth", alpha = 0.3, size=1.5), combo = wrap("facethist", bins = 20)), progress = F) +
+  theme_bw()
+```
+
+Some observations from the plot:
+Both the correlations and scatterplots show that a positive relationship appears to exist between students attitudes and their statistics course exam points, i.e. those with a more positive attitude towards learning seem to do better. Men's attitudes seem slightly higher compared to women's.
+
+Looking at the correlations, there is a weak negative correlation between exam points and age, and exam points and scores of surface learning, whereas scores of strategic learning and exam points seem to correlate positively. Moreover, especially for men, scores of deep learning correlate negatively with scores related to surface learning, which seems quite logical.
+
+We can also see that there are more females than males and that despite the wide age range, most of the students are below age 30: the mean age is 26, as can be seen below.
+
+```{r}
+lrn2014$age %>% mean()
+```
+Overall, the exam points of all students vary between a maximum of 33 and minimum on 7 but the density plot and boxplot above suggest the distribution of points is not that normal but instead skewed towards left.
+```{r}
+lrn2014$points %>% min()
+lrn2014$points %>% max()
+```
+
+### 3. Regression model
+
+I choose attitude, strategic learning and surface learning as the explanatory variables of points and fit the following model:
+```{r}
+model1 <- lm(points ~ attitude + stra + surf, data = lrn2014)
+summary(model1)  # Check model fit
+```
+The regression result suggests, that neither strategic nor surface learning have much effect and are not significant predictors of exam points. Only the slope estimate for attitude is significantly different from 0 here. All together, the three variables explain about one fifth of the variation in exam points.
+I drop the two non-significant explanatory variables and fit a new simple model:
+
+```{r}
+model2 <- lm(points ~ attitude, data = lrn2014)
+summary(model2)  # Check model fit
+```
+### 4. Interpretation
+
+The R-squared of the second model is 0.1906, almost the same as in the first model although two explanatory variables were removed. Overall, this model alone does not explain that much, but still around 19% of the variation in exam points is explained by the variation in attitude score. The slope estimate for attitude is 3.5, so by each unit increase in attitude score, the exam result increases by 3.5 points. 
+
+Below a scatterplot of the data with the fitted line. 
+```{r, warning=FALSE}
+p1 <- lrn2014 %>% 
+  ggplot() + 
+  geom_point(aes(x = attitude, y = points)) +
+  geom_line(aes(x = attitude, y = predict(model2)))
+
+p2 <- qplot(attitude, points, data = lrn2014) +
+  geom_smooth(method = "lm")
+
+p1 | p2
+
+```
+
+### 5. Diagnostic plots
+
+The linear model assumes normal distribution of residuals. The normal Q-Q plot shows that residuals are more or less normally distributed, but still somewhat diverging from the straight line, especially towards the extremes.
+
+The linear model also assumes equal variance of residuals. The plot of residuals vs fitted values seems quite reasonable and the residuals seem to be spread more or less randomly around the 0 line.
+
+Residuals vs Leverage plot does not indicate any extreme problematic outliers with a high leverage value (?).
+
+(I have not been looking much at these kinds of diagnostic plots and I find it quite difficult to really get what they mean and how to evaluate them reasonably.)
+```{r}
+par(mfrow = c(1,3))
+plot(model2, which = c(1, 2, 5))
+```
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,6 @@
 
+This is a course diary for *Introduction to Open Data Science*, November-December 2022.
+
 # Week 1
 
 With mixed feelings at the moment. I am glad I managed to take this course this year but I am anticipating busy weeks and I am worried I won't have as much time to dedicate to the course as I would like, without sacrificing too many hours of sleep or family time with kids. But I am hoping to get more used to working with R and I believe every extra hour counts so I'll just try to do my best to keep up with the pace of the course. 
