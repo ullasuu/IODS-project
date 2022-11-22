@@ -1,0 +1,171 @@
+# Week 3. Logistic regression
+
+Here is my report for the assignment of week three. I am starting a bit late so let's see how far I get before running out of time.
+
+```{r}
+date()
+```
+
+Load needed packages:
+```{r, message=FALSE}
+library(tidyverse); library(dplyr); library(ggplot2)
+```
+
+
+### 2. Read in data 
+
+I read the data from my local folder.
+```{r, message=FALSE}
+alc <- read_csv("data/alc.csv")
+```
+
+The data used in the exercise contains information on student performance in two Portuguese secondary schools. The data is based on school reports and questionnaires and include info on grades, demographics, and school related characteristics, and for example, on alcohol consumption. Two separate datasets are available: performance in Mathematics (mat) and in Portuguese language (por). More information is available [here](https://archive.ics.uci.edu/ml/datasets/Student+Performance).
+
+I check the column names
+```{r}
+colnames(alc)
+```
+
+and have a quick look on the data.
+```{r}
+glimpse(alc)
+```
+
+The data contain 35 variables and 370 observations.
+
+### 3. Selection of predictors 
+
+One of the variables is a logical TRUE/FALSE variable on high use of alcohol. This is the target variable of interest in this exercise. To study the relationships between high/low alcohol consumption and some other characteristics I select the following and my hypothesis are:
+
+**Sex** - I hypothesize that there are more high users among men.
+
+**Study time** -  I hypothesize that those who study more are perhaps more focused and motivated and consequently use less alcohol.
+
+**Going out with friends** - My hypothesis is that students who go out more consume more alcohol and are thus more likely to be high users.
+
+**Extra-curricular activities** - Leisure time activities may be associated with a healthier lifestyle and mean there is less time for drinking. I hypothesize that students with extra-curricular activities are less likely to be heavy drinkers.
+
+### 4. Numerical and graphical exploration
+
+To study the relationships further I start with a simple barplot of high use for men and women separately.
+```{r, out.width = '50%'}
+plot1 <- ggplot(data = alc, aes(x = high_use)) +
+  geom_bar() +
+  facet_wrap("sex")
+plot1
+```
+
+The plot suggests that there are more high users among males. However, the groups of males and females differ in size so let's have a look at the proportions within each sex.
+
+```{r}
+t1 <- table(high_use = alc$high_use, sex = alc$sex)
+t1
+prop.table(t1, 2)
+```
+The frequency table with percentages shows that 40% of all males are high users whereas 21% of all women are high users. This supports my hypothesis that there are more high users among men.
+
+The relationship between studytime (grouped as: 1 = <2 hours, 2 = 2 to 5 hours, 3 = 5 to 10 hours, or 4 = >10 hours per week) and alcohol consumption is illustrated below in a frequency table and a barplot:
+```{r}
+t2 <- table(high_use = alc$high_use, studytime = alc$studytime)
+t2
+prop.table(t2, 2)
+```
+
+```{r, out.width = '50%'}
+plot2 <- ggplot(data = alc, aes(x = studytime, color = high_use)) +
+  geom_bar(fill = NA)
+plot2
+```
+
+Among those who study the least, less than 2 hours per week, nearly 43% are high users of alcohol. By contrast, among those students who study more, between 5 and 10 hors or over 10 hours per week the proportion of high users is much lower, 13% and 15%. So there it seems that those who study more are less likely to drink a lot.
+
+Going out with friends is categorized as: from 1 - very low to 5 - very high. 
+```{r, out.width = '50%'}
+plot3 <- ggplot(data = alc, aes(x = goout, color = high_use)) +
+  geom_bar(fill = NA)
+plot3
+```
+
+```{r}
+t3 <- table(high_use = alc$high_use, go_out = alc$goout)
+t3
+prop.table(t3, 2)
+```
+
+There seems to be a clear gradient - the proportion of high users increses as students report going out more. Among those who do not go out much 14% are considered as high users. Over 60% of those students who go out a lot are high users.
+
+Finally, I hypothesize that extra-curricular activities "protect" from high alcohol consumption. 27% of students with activities are high users versus 33% of those who do not have after school activities. The results suggest some weak support for my hypothesis. 
+```{r}
+t4 <- table(high_use = alc$high_use, activ = alc$activities)
+t4
+prop.table(t4, 2)
+```
+
+```{r, out.width = '50%'}
+plot4 <- ggplot(data = alc, aes(x = activities, color = high_use)) +
+  geom_bar(fill = NA)
+plot4
+```
+
+### 5. Logistic regression
+
+Logistic regression of my variables as predictors and the binary high/low alcohol consumption variable as the target is fit below, model specified as “binomial”.
+```{r}
+model0 <- glm(high_use ~ sex + studytime + goout + activities, data = alc, family = "binomial")
+summary(model0) #summary of the model
+```
+```{r}
+OR <- coef(model0) %>% exp # Coefficients as odds ratios
+CI <- confint(model0) %>% exp # Confidence intervals as odds ratios
+cbind(OR, CI) # odds ratios with confidence intervals
+```
+
+Of the selected predictors sex, studytime and going out with friends seem to associate significantly with high use of alcohol - the confidence intervals of these variables do not include 1.
+
+Men have two times higher odds of being a high user of alcohol compared to women.
+Those who study more use less alcohol according to the results: for each point increase in studytime per week the students have 0.64 times lower odds of being a high consumer.
+Those who go out have higher odds of being high consumers, with a 2.1 times higher odds for each increase in going out score.
+
+
+### 6. Predictive power
+
+Fit a new model with the significant predictors only:
+```{r}
+model1 <- glm(high_use ~ sex + studytime +  goout, data = alc, family = "binomial")
+```
+
+```{r}
+probabilities <- predict(model1, type = "response") # predicting probability of high_use
+alc <- mutate(alc, probability = probabilities)
+alc <- mutate(alc, prediction = probability > 0.5)
+
+select(alc, high_use, sex, studytime, probability, prediction) %>% tail(10)
+```
+
+Cross tabulation of predictions versus the actual values:
+```{r}
+table(high_use = alc$high_use, prediction = alc$prediction)
+```
+
+For students with high alcohol use (FALSE), the model predicted 234 of them correct, and 25 wrong. For students with high alcohol use (TRUE) the model predicted well 53 and wrong 58.
+
+Calculate proportion of inaccurately classified students. I use the function from the exercise set:
+```{r}
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+loss_func(class = alc$high_use, prob = alc$probability)
+```
+Around 22% of the predictions were wrong. 
+Same as (figures from the crosstabulation):
+```{r}
+(25+58)/370
+```
+
+Finally, a graphic visualization of both the actual values and the predictions:
+```{r, out.width = '50%'}
+ggplot(alc, aes(x = probability, y = high_use, col = prediction)) +
+  geom_point()
+```
+
